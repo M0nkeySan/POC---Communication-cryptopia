@@ -1,6 +1,7 @@
 """ This is a wrapper for Cryptopia.co.nz API """
+# -*- coding: utf-8 -*-
 
-import urllib
+import urllib.parse
 import json
 import time
 import hmac
@@ -167,12 +168,16 @@ class Api(object):
     def secure_headers(self, url, post_data):
         """ Creates secure header for cryptopia private api. """
         nonce = str(int(time.time()))
+
         md5 = hashlib.md5()
-        md5.update(post_data)
+        md5.update(post_data.encode("UTF-8"))
+
         rcb64 = base64.b64encode(md5.digest())
         signature = self.key + "POST" + \
-            urllib.quote_plus(url).lower() + nonce + rcb64
-        sign = base64.b64encode(
-            hmac.new(self.secret, signature, hashlib.sha256).digest())
-        header_value = "amx " + self.key + ":" + sign + ":" + nonce
+        urllib.parse.quote_plus(url).lower() + nonce + rcb64.decode("UTF-8")
+
+        hmacraw = hmac.new(self.secret, signature.encode("UTF-8"), hashlib.sha256).digest()
+        sign = base64.b64encode(hmacraw)
+
+        header_value = "amx " + self.key + ":" + sign.decode("UTF-8") + ":" + nonce
         return {'Authorization': header_value, 'Content-Type': 'application/json; charset=utf-8'}

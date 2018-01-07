@@ -7,10 +7,6 @@ import sys
 from cryptopia_api import Api
 import actions
 
-reload(sys)
-sys.setdefaultencoding('utf-8')
-
-
 # Get these from (link here)
 def get_secret(secret_file):
     """Grabs API key and secret from file and returns them"""
@@ -24,7 +20,7 @@ def get_secret(secret_file):
 
 def sigint_handler():
     """Handler for ctrl+c"""
-    print '\n[!] CTRL+C pressed. Exiting...'
+    print('\n[!] CTRL+C pressed. Exiting...')
     sys.exit(0)
 
 
@@ -35,75 +31,74 @@ while not EXIT_CYCLE:
     KEY, SECRET = get_secret("secrets.json")
     API = Api(KEY, SECRET)
 
-    COIN = raw_input("Choisissez le coin à observer : \
+    COIN = input("Choisissez le coin à observer : \
            \nSoyez précis !\nEcrivez en majuscule (ex : WISH)\n")
 
     # do before entering coin to save the API call during the pump
     BALANCE, ERROR = API.get_balance(COIN)
     if ERROR is not None:
-        print "L'erreur suivante a été retournée : \n" + ERROR
+        print("L'erreur suivante a été retournée : \n" + ERROR)
         AVAILABLE = 0
-
-
-    # AVAILABLE = BALANCE['Available']
+    else:
+        AVAILABLE = BALANCE['Available']
 
     signal.signal(signal.SIGINT, sigint_handler)
 
     ALLOW_ORDERS = True
 
-    print 'Vous avez', AVAILABLE, COIN, 'disponible(s).'
+    print('Vous avez', AVAILABLE, COIN, 'disponible(s).')
 
     PAIRS, ERROR = API.get_tradepairs()
 
-    print 'Choisissez votre paire :'
+    print('Choisissez votre paire :')
     index = 0
     LISTE_PAIRES = []
 
     for PAIR in PAIRS:
         if PAIR['Status'] == 'OK' and COIN + "/" in PAIR['Label']:
             LISTE_PAIRES.append(PAIR['Label'])
-            print index, ":", PAIR['Label']
+            print(index, ":", PAIR['Label'])
             index += 1
 
     if index == 0:
-        print "Aucune paire tradable n'a été trouvé."
+        print("Aucune paire tradable n'a été trouvé.")
         break
 
     while True:
         correct = False
         while not correct:
             try:
-                INDEX_PAIRE = int(raw_input("Votre choix : "))
+                INDEX_PAIRE = int(input("Votre choix : "))
                 correct = True
             except ValueError:
-                print 'Veuillez entrer un chiffre en 0 et', index-1, '!'
+                print('Veuillez entrer un chiffre en 0 et', index - 1, '!')
 
         if len(LISTE_PAIRES) > INDEX_PAIRE:
             PAIR = LISTE_PAIRES[INDEX_PAIRE]
             break
 
     liste_actions = {0: actions.observation,
-            1: actions.buy_order,
-            2: actions.sell_order}
+                     1: actions.buy_order,
+                     2: actions.sell_order}
 
     while True:
         correct = False
         while not correct:
             try:
-                ACTION = int(raw_input("Quelle action voulez-vous réaliser ? : \
+                ACTION = int(input("Quelle action voulez-vous réaliser ? : \
                             \n0: Observation du cours. \
                             \n1: Faire un buy order. \
                             \n2: Faire un sell order. \
                             \nVotre choix : "))
                 correct = True
             except ValueError:
-                print 'Veuillez entrer un chiffre en 0 et 2 !'
+                print('Veuillez entrer un chiffre en 0 et 2 !')
 
         if len(liste_actions) > ACTION:
             liste_actions[ACTION](API, PAIR)
             break
 
     if __name__ == "__main__":
-        ANSWER = raw_input("\nVoulez-vous relancer le bot ? (y/n) ")
+        ANSWER = input("\nVoulez-vous relancer le bot ? (y/n) ")
         if ANSWER.lower().strip() in "n no".split():
             EXIT_CYCLE = True
