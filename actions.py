@@ -29,30 +29,23 @@ def buy_order(api, pair):
 
     libelles_coin = pair.split("_", 1)
 
-    balance_achat, error = api.get_balance(libelles_coin[1])
-    if error is not None:
-        print("L'erreur suivante a été retournée : \n" + error)
-        disponibilite_achat = 0
-    else:
-        disponibilite_achat = balance_achat['Available']
+    ordre_fini = False
 
-    print('Vous avez', disponibilite_achat, libelles_coin[1], 'disponible(s).')
+    while ordre_fini is not True:
 
-    if disponibilite_achat != 0:
-        print('Vous ne pouvez pas effectuer de buy order')
-        return
-    else:
-        correct = False
-        while not correct:
-            try:
-                balance_utilisee = float(
-                    input("Combien de {} voulez-vous utiliser ? : ".format(libelles_coin[1])))
-                correct = True
-            except ValueError:
-                print('Veuillez entrer un nombre !')
+        balance_achat, error = api.get_balance(libelles_coin[1])
+        if error is not None:
+            print("L'erreur suivante a été retournée : \n" + error)
+            disponibilite_achat = 0
+        else:
+            disponibilite_achat = balance_achat['Available']
 
-        while balance_utilisee > disponibilite_achat:
-            print('Vous ne pouvez utiliser plus de {}'.format(disponibilite_achat))
+        print('Vous avez', disponibilite_achat, libelles_coin[1], 'disponible(s).')
+
+        if disponibilite_achat != 0:
+            print('Vous ne pouvez pas effectuer de buy order')
+            return
+        else:
             correct = False
             while not correct:
                 try:
@@ -62,35 +55,93 @@ def buy_order(api, pair):
                 except ValueError:
                     print('Veuillez entrer un nombre !')
 
-        marche_paire, error = api.get_market(pair)
-        if error is not None:
-            print("L'erreur suivante a été retournée : \n" + error)
-            return
+            while balance_utilisee > disponibilite_achat:
+                print('Vous ne pouvez utiliser plus de {}'.format(disponibilite_achat))
+                correct = False
+                while not correct:
+                    try:
+                        balance_utilisee = float(
+                            input("Combien de {} voulez-vous utiliser ? : ".format(libelles_coin[1])))
+                        correct = True
+                    except ValueError:
+                        print('Veuillez entrer un nombre !')
 
-        print("L'ordre de vente le moins cher est de {:.8f} \n".format(marche_paire['AskPrice']))
+            marche_paire, error = api.get_market(pair)
+            if error is not None:
+                print("L'erreur suivante a été retournée : \n" + error)
+                return
 
-        correct = False
-        while not correct:
-            try:
-                bid_price = float(input("Quel est votre prix ? : "))
-                correct = True
-            except ValueError:
-                print('Veuillez entrer un nombre !')
+            print("L'ordre de vente le moins cher est de {:.8f} \n".format(marche_paire['AskPrice']))
 
-        # prise en compte des fees de Cryptopia pour calculé le nombre de coins achetable
-        num_coins = (balance_utilisee * (balance_utilisee * 0.00201)) / bid_price
-        prix_achat = bid_price * num_coins
+            correct = False
+            while not correct:
+                try:
+                    bid_price = float(input("Quel est votre prix ? : "))
+                    correct = True
+                except ValueError:
+                    print('Veuillez entrer un nombre !')
 
-        trade, error = api.submit_trade(pair.replace("_", "/"), 'Buy', bid_price, num_coins)
-        if error is not None:
-            print("L'erreur suivante a été retournée : \n" + error)
-            return
+            # prise en compte des fees de Cryptopia pour calculé le nombre de coins achetable
+            num_coins = (balance_utilisee * (balance_utilisee * 0.00201)) / bid_price
+            prix_achat = bid_price * num_coins
 
-        print(trade)
+            trade, error = api.submit_trade(pair.replace("_", "/"), 'Buy', bid_price, num_coins)
+            if error is not None:
+                print("L'erreur suivante a été retournée : \n" + error)
+                return
 
-        print("\n[+] Ordre d'achat placé pour {:.8f} {} coins à {:.8f} {} \
-               chacun pour un total de {} {}".format(num_coins, libelles_coin[0], bid_price, libelles_coin[1],
-                                                     prix_achat, libelles_coin[1]))
+            print(trade)
+
+            print("\n[+] Ordre d'achat placé pour {:.8f} {} coins à {:.8f} {} \
+                   chacun pour un total de {} {}".format(num_coins, libelles_coin[0], bid_price, libelles_coin[1],
+                                                         prix_achat, libelles_coin[1]))
+
+            time.sleep(5)
+
+            open_orders, error = api.get_openorders(pair.replace("_", "/"))
+            if error is not None:
+                print("L'erreur suivante a été retournée : \n" + error)
+                return
+
+            if open_orders is not None:
+                print("Votre ordre n'est pas passé entierement, il reste {:.8f} coins à acheter".format(open_orders[0]['Remaining']))
+
+                correct = False
+
+                while correct is not True:
+                    reponse = input("Voulez-vous modifier votre ordre ? (y/n)")
+
+                    if reponse == "y":
+                        correct = True
+                        data, error = api.cancel_trade('Buy', open_orders[0]['OrderId'], open_orders[0]['TradePairId'])
+
+                        if error is not None:
+                            print("L'erreur suivante a été retournée : \n" + error)
+                            return
+                    elif reponse == "n":
+                        correct = True
+                        ordre_fini = True
+                        return
+            else:
+                balance, error = api.get_balance(libelles_coin[1])
+                if error is not None:
+                    print("L'erreur suivante a été retournée : \n" + error)
+                    disponibilite = 0
+                else:
+                    disponibilite = balance['Available']
+
+                print("Votre ordre est  passé entierement !")
+                print('Vous avez', disponibilite, libelles_coin[1], 'disponible(s).')
+
+                balance, error = api.get_balance(libelles_coin[1])
+                if error is not None:
+                    print("L'erreur suivante a été retournée : \n" + error)
+                    disponibilite = 0
+                else:
+                    disponibilite = balance['Available']
+                print('Vous avez', disponibilite, libelles_coin[0], 'disponible(s).')
+
+                return
 
 
 def sell_order(api, pair):
@@ -98,30 +149,22 @@ def sell_order(api, pair):
 
     libelles_coin = pair.split("_", 1)
 
-    balance_vente, error = api.get_balance(libelles_coin[0])
-    if error is not None:
-        print("L'erreur suivante a été retournée : \n" + error)
-        disponibilite_vente = 0
-    else:
-        disponibilite_vente = balance_vente['Available']
+    ordre_fini = False
 
-    print('Vous avez', disponibilite_vente, libelles_coin[0], 'disponible(s).')
+    while ordre_fini is not True:
+        balance_vente, error = api.get_balance(libelles_coin[0])
+        if error is not None:
+            print("L'erreur suivante a été retournée : \n" + error)
+            disponibilite_vente = 0
+        else:
+            disponibilite_vente = balance_vente['Available']
 
-    if disponibilite_vente == 0:
-        print('Vous ne pouvez pas effectuer de sell order')
-        return
-    else:
-        while not correct:
-            try:
-                balance_utilisee = float(
-                    input("Combien de {} voulez-vous utiliser ? : ".format(libelles_coin[0])))
-                correct = True
-            except ValueError:
-                print('Veuillez entrer un nombre !')
+        print('Vous avez', disponibilite_vente, libelles_coin[0], 'disponible(s).')
 
-        while balance_utilisee > disponibilite_vente:
-            print('Vous ne pouvez utiliser plus de {}'.format(disponibilite_vente))
-            correct = False
+        if disponibilite_vente == 0:
+            print('Vous ne pouvez pas effectuer de sell order')
+            return
+        else:
             while not correct:
                 try:
                     balance_utilisee = float(
@@ -130,32 +173,90 @@ def sell_order(api, pair):
                 except ValueError:
                     print('Veuillez entrer un nombre !')
 
-        marche_paire, error = api.get_market(pair)
-        if error is not None:
-            print("L'erreur suivante a été retournée : \n" + error)
-            return
+            while balance_utilisee > disponibilite_vente:
+                print('Vous ne pouvez utiliser plus de {}'.format(disponibilite_vente))
+                correct = False
+                while not correct:
+                    try:
+                        balance_utilisee = float(
+                            input("Combien de {} voulez-vous utiliser ? : ".format(libelles_coin[0])))
+                        correct = True
+                    except ValueError:
+                        print('Veuillez entrer un nombre !')
 
-        print("L'ordre d'achat le plus cher est de {:.8f} \n".format(marche_paire['BidPrice']))
+            marche_paire, error = api.get_market(pair)
+            if error is not None:
+                print("L'erreur suivante a été retournée : \n" + error)
+                return
 
-        correct = False
-        while not correct:
-            try:
-                ask_price = float(input("Quel est votre prix ? : "))
-                correct = True
-            except ValueError:
-                print('Veuillez entrer un nombre !')
+            print("L'ordre d'achat le plus cher est de {:.8f} \n".format(marche_paire['BidPrice']))
 
-        # prise en compte des fees de Cryptopia pour calculé le nombre de coins vendable
-        num_coins = (balance_utilisee * (balance_utilisee * 0.00201)) / ask_price
-        prix_vente = ask_price * num_coins
+            correct = False
+            while not correct:
+                try:
+                    ask_price = float(input("Quel est votre prix ? : "))
+                    correct = True
+                except ValueError:
+                    print('Veuillez entrer un nombre !')
 
-        trade, error = api.submit_trade(pair.replace("_", "/"), 'Sell', ask_price, num_coins)
-        if error is not None:
-            print("L'erreur suivante a été retournée : \n" + error)
-            return
+            # prise en compte des fees de Cryptopia pour calculé le nombre de coins vendable
+            num_coins = (balance_utilisee * (balance_utilisee * 0.00201)) / ask_price
+            prix_vente = ask_price * num_coins
 
-        print(trade)
+            trade, error = api.submit_trade(pair.replace("_", "/"), 'Sell', ask_price, num_coins)
+            if error is not None:
+                print("L'erreur suivante a été retournée : \n" + error)
+                return
 
-        print("\n[+] Ordre de vente placé pour {:.8f} {} coins à {:.8f} {} \
-               chacun pour un total de {} {}".format(num_coins, libelles_coin[0], ask_price, libelles_coin[1],
-                                                     prix_vente, libelles_coin[1]))
+            print(trade)
+
+            print("\n[+] Ordre de vente placé pour {:.8f} {} coins à {:.8f} {} \
+                   chacun pour un total de {} {}".format(num_coins, libelles_coin[0], ask_price, libelles_coin[1],
+                                                         prix_vente, libelles_coin[1]))
+            time.sleep(5)
+
+            open_orders, error = api.get_openorders(pair.replace("_", "/"))
+            if error is not None:
+                print("L'erreur suivante a été retournée : \n" + error)
+                return
+
+            if open_orders is not None:
+                print("Votre ordre n'est pas passé entierement, il reste {:.8f} coins à vendre".format(
+                    open_orders[0]['Remaining']))
+
+                correct = False
+
+                while correct is not True:
+                    reponse = input("Voulez-vous modifier votre ordre ? (y/n)")
+
+                    if reponse == "y":
+                        correct = True
+                        data, error = api.cancel_trade('Sell', open_orders[0]['OrderId'], open_orders[0]['TradePairId'])
+
+                        if error is not None:
+                            print("L'erreur suivante a été retournée : \n" + error)
+                            return
+                    elif reponse == "n":
+                        correct = True
+                        ordre_fini = True
+                        return
+            else:
+                balance, error = api.get_balance(libelles_coin[1])
+                if error is not None:
+                    print("L'erreur suivante a été retournée : \n" + error)
+                    disponibilite = 0
+                else:
+                    disponibilite = balance['Available']
+
+                print("Votre ordre est  passé entierement !")
+                print('Vous avez', disponibilite, libelles_coin[1], 'disponible(s).')
+
+                balance, error = api.get_balance(libelles_coin[1])
+                if error is not None:
+                    print("L'erreur suivante a été retournée : \n" + error)
+                    disponibilite = 0
+                else:
+                    disponibilite = balance['Available']
+                print('Vous avez', disponibilite, libelles_coin[0], 'disponible(s).')
+
+                return
