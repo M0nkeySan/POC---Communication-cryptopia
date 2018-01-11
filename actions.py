@@ -165,6 +165,7 @@ def sell_order(api, pair):
             print('Vous ne pouvez pas effectuer de sell order')
             return
         else:
+            correct = False
             while not correct:
                 try:
                     balance_utilisee = float(
